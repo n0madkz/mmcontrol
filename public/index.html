@@ -209,5 +209,92 @@ $('expenseForm').onsubmit=event=>{event.preventDefault();const form=event.target
 function reconcileTransferPayments(){let changed=false;db.expenses.forEach(expense=>{if(expense.category!==TRANSFER_EXPENSE&&expense.category!==PERSONAL_EXPENSE)return;const beforeId=expense.linkedPersonalPaymentId,before=beforeId?db.payments.find(payment=>payment.id===beforeId):null,beforeState=before?JSON.stringify(before):'';syncLinkedExpenseIncome(expense);const after=db.payments.find(payment=>payment.id===expense.linkedPersonalPaymentId);if(beforeId!==expense.linkedPersonalPaymentId||beforeState!==JSON.stringify(after||null))changed=true});return changed}
 const initializeCloudWithTransferReconciliation=initializeCloudData;initializeCloudData=async function(){await initializeCloudWithTransferReconciliation();if(reconcileTransferPayments()){localStorage.setItem(K,JSON.stringify(db));render();queueCloudSave()}};
 if(reconcileTransferPayments()){localStorage.setItem(K,JSON.stringify(db));queueCloudSave()}
+
+// Transfers are independent operations, not expense categories.
+document.querySelector('[data-tab="backup"]')?.remove();
+const backupSectionV2=$('backup'),backupCardV2=backupSectionV2?.querySelector('.card');
+if(backupCardV2){backupCardV2.querySelector('p')?.remove();const backupTitleV2=document.createElement('h3');backupTitleV2.textContent='\u0420\u0435\u0437\u0435\u0440\u0432\u043d\u0430\u044f \u043a\u043e\u043f\u0438\u044f';backupCardV2.prepend(backupTitleV2);settingsSection.appendChild(backupCardV2);backupSectionV2.remove()}
+
+expenseCategorySelect?.querySelector('[data-transfer-expense]')?.remove();
+transferTargetSelect?.remove();
+updateTransferTarget=function(){};
+
+function syncPersonalIncomeV2(expense){
+  if(expense.category!==PERSONAL_EXPENSE){if(expense.linkedPersonalPaymentId){db.payments=db.payments.filter(payment=>payment.id!==expense.linkedPersonalPaymentId);delete expense.linkedPersonalPaymentId}return}
+  let payment=expense.linkedPersonalPaymentId?db.payments.find(item=>item.id===expense.linkedPersonalPaymentId):null;
+  if(!payment){expense.linkedPersonalPaymentId='personal-'+Date.now()+'-'+Math.random().toString(16).slice(2);payment={id:expense.linkedPersonalPaymentId};db.payments.push(payment)}
+  Object.assign(payment,{objectId:'',company:PERSONAL_COMPANY,targetCompany:PERSONAL_COMPANY,sourceCompany:expense.company||obj(expense.objectId)?.company||'',sourceAccount:expense.account||'',date:expense.date,type:PERSONAL_EXPENSE,account:'\u041b\u0438\u0447\u043d\u044b\u0439 \u0441\u0447\u0451\u0442',amount:expense.amount,doc:expense.doc||expense.note||'',automatic:true,internalTransfer:false,linkedPersonalExpense:true})
+}
+syncLinkedExpenseIncome=syncPersonalIncomeV2;
+
+function migrateLegacyTransfersV2(){
+  if(!Array.isArray(db.transfers))db.transfers=[];
+  let changed=false;
+  db.expenses=db.expenses.filter(expense=>{
+    if(expense.category!==TRANSFER_EXPENSE)return true;
+    const payment=expense.linkedPersonalPaymentId?db.payments.find(item=>item.id===expense.linkedPersonalPaymentId):null;
+    const sourceCompany=expense.company||obj(expense.objectId)?.company||payment?.sourceCompany||'';
+    const targetCompany=expense.targetCompany||payment?.targetCompany||payment?.company||obj(expense.targetObjectId)?.company||'';
+    if(!sourceCompany||!targetCompany)return true;
+    const linkedPaymentId=expense.linkedPersonalPaymentId||payment?.id||'';
+    if(!db.transfers.some(item=>item.linkedPaymentId===linkedPaymentId&&linkedPaymentId)){
+      db.transfers.push({id:'transfer-'+Date.now()+'-'+Math.random().toString(16).slice(2),date:expense.date,sourceCompany,sourceAccount:expense.account||payment?.sourceAccount||'\u0411\u0430\u043d\u043a',targetCompany,targetAccount:payment?.targetAccount||payment?.account||'\u0411\u0430\u043d\u043a',amount:Number(expense.amount||0),doc:expense.doc||'',note:expense.note||'',linkedPaymentId});
+    }
+    changed=true;
+    return false;
+  });
+  return changed;
+}
+
+function syncTransferIncomeV2(transfer){
+  let payment=transfer.linkedPaymentId?db.payments.find(item=>item.id===transfer.linkedPaymentId):null;
+  if(!payment){transfer.linkedPaymentId='transfer-income-'+Date.now()+'-'+Math.random().toString(16).slice(2);payment={id:transfer.linkedPaymentId};db.payments.push(payment)}
+  Object.assign(payment,{objectId:'',company:transfer.targetCompany,targetCompany:transfer.targetCompany,targetAccount:transfer.targetAccount,sourceCompany:transfer.sourceCompany,sourceAccount:transfer.sourceAccount,date:transfer.date,type:TRANSFER_EXPENSE,account:transfer.targetAccount,amount:Number(transfer.amount||0),doc:transfer.doc||transfer.note||'',automatic:true,internalTransfer:true,linkedTransferId:transfer.id});
+}
+
+function reconcileTransfersV2(){
+  const migrated=migrateLegacyTransfersV2();
+  db.transfers.forEach(syncTransferIncomeV2);
+  return migrated;
+}
+
+const transferTabV2=document.createElement('button');
+transferTabV2.type='button';transferTabV2.className='tab';transferTabV2.dataset.tab='transfers';transferTabV2.textContent='\u041f\u0435\u0440\u0435\u0432\u043e\u0434\u044b';
+settingsTab.before(transferTabV2);
+const transferSectionV2=document.createElement('section');
+transferSectionV2.id='transfers';transferSectionV2.className='section';
+transferSectionV2.innerHTML='<h2>\u041f\u0435\u0440\u0435\u0432\u043e\u0434\u044b \u043c\u0435\u0436\u0434\u0443 \u0441\u0447\u0435\u0442\u0430\u043c\u0438</h2><div class="card"><form id="transferForm"><select name="sourceCompany" required></select><select name="sourceAccount" required><option>\u0411\u0430\u043d\u043a</option><option>\u041a\u0430\u0441\u0441\u0430</option><option>\u041a\u0430\u0440\u0442\u0430</option></select><label class="field"><span>\u0414\u0430\u0442\u0430 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0430</span><input name="date" type="date" required></label><select name="targetCompany" required></select><select name="targetAccount" required><option>\u0411\u0430\u043d\u043a</option><option>\u041a\u0430\u0441\u0441\u0430</option><option>\u041a\u0430\u0440\u0442\u0430</option></select><input name="amount" type="number" min="0" step="0.01" placeholder="\u0421\u0443\u043c\u043c\u0430" required><input name="doc" placeholder="\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442 / \u043d\u043e\u043c\u0435\u0440 / \u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439"><input name="note" placeholder="\u041f\u0440\u0438\u043c\u0435\u0447\u0430\u043d\u0438\u0435"><button class="primary full" type="submit">\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043f\u0435\u0440\u0435\u0432\u043e\u0434</button></form></div><div class="card" style="margin-top:14px"><div class="table-wrap"><table><thead><tr><th>\u0414\u0430\u0442\u0430</th><th>\u0421\u043e \u0441\u0447\u0451\u0442\u0430</th><th>\u041d\u0430 \u0441\u0447\u0451\u0442</th><th>\u0421\u0443\u043c\u043c\u0430</th><th>\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442</th><th>\u041f\u0440\u0438\u043c\u0435\u0447\u0430\u043d\u0438\u0435</th><th>\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044f</th></tr></thead><tbody id="transfersBody"></tbody></table></div></div>';
+settingsSection.before(transferSectionV2);
+const transferFormV2=$('transferForm');
+
+function transferCompanyOptionsV2(current=''){
+  ensureCompanies();
+  const list=db.companies||[];
+  const markup='<option value="">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044e</option>'+list.map(name=>`<option value="${esc(name)}">${esc(name)}${name===PERSONAL_COMPANY?' (\u043b\u0438\u0447\u043d\u044b\u0439)':''}</option>`).join('');
+  ['sourceCompany','targetCompany'].forEach(name=>{const select=transferFormV2.elements[name],value=name==='sourceCompany'?current.sourceCompany||select.value:current.targetCompany||select.value;select.innerHTML=markup;if(list.includes(value))select.value=value});
+}
+
+function renderTransfersV2(){
+  if(!Array.isArray(db.transfers))db.transfers=[];
+  transferCompanyOptionsV2({});
+  $('transfersBody').innerHTML=db.transfers.length?db.transfers.map((transfer,index)=>`<tr><td>${esc(transfer.date)}</td><td><strong>${esc(transfer.sourceCompany)}</strong><small style="display:block">${esc(transfer.sourceAccount)}</small></td><td><strong>${esc(transfer.targetCompany)}</strong><small style="display:block">${esc(transfer.targetAccount)}</small></td><td class="amount">${money(transfer.amount)}</td><td class="doc">${esc(transfer.doc)||'\u2014'}</td><td class="doc">${esc(transfer.note)||'\u2014'}</td><td><button type="button" class="secondary" onclick="showTransferV2(${index})">\u041f\u0440\u043e\u0441\u043c\u043e\u0442\u0440</button> ${actionMenu(`editTransferV2(${index})`,`delTransferV2(${index})`)}</td></tr>`).join(''):empty(7);
+}
+
+function showTransferV2(index){const transfer=db.transfers?.[index];if(!transfer)return;details('\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043c\u0435\u0436\u0434\u0443 \u0441\u0447\u0451\u0442\u0430\u043c\u0438',[[ '\u0414\u0430\u0442\u0430',transfer.date],[ '\u0421\u043e \u0441\u0447\u0451\u0442\u0430',`${transfer.sourceCompany} \u2014 ${transfer.sourceAccount}`],[ '\u041d\u0430 \u0441\u0447\u0451\u0442',`${transfer.targetCompany} \u2014 ${transfer.targetAccount}`],[ '\u0421\u0443\u043c\u043c\u0430',money(transfer.amount)],[ '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442',transfer.doc],[ '\u041f\u0440\u0438\u043c\u0435\u0447\u0430\u043d\u0438\u0435',transfer.note]])}
+function editTransferV2(index){const transfer=db.transfers?.[index];if(!transfer)return;transferFormV2.dataset.editIndex=index;transferCompanyOptionsV2(transfer);['sourceAccount','date','targetAccount','amount','doc','note'].forEach(name=>setFormValue(transferFormV2,name,transfer[name]));transferFormV2.querySelector('.primary').textContent='\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f';transferFormV2.scrollIntoView({behavior:'smooth',block:'center'})}
+async function delTransferV2(index){if(!await requireDeletePassword())return;if(!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043f\u0435\u0440\u0435\u0432\u043e\u0434?'))return;const transfer=db.transfers?.[index];if(!transfer)return;if(transfer.linkedPaymentId)db.payments=db.payments.filter(payment=>payment.id!==transfer.linkedPaymentId);db.transfers.splice(index,1);save()}
+transferFormV2.onsubmit=event=>{event.preventDefault();const form=event.target,data=new FormData(form),index=form.dataset.editIndex,existing=index!==undefined?db.transfers[Number(index)]:null,transfer={id:existing?.id||'transfer-'+Date.now()+'-'+Math.random().toString(16).slice(2),linkedPaymentId:existing?.linkedPaymentId||'',date:data.get('date'),sourceCompany:data.get('sourceCompany'),sourceAccount:data.get('sourceAccount'),targetCompany:data.get('targetCompany'),targetAccount:data.get('targetAccount'),amount:Number(data.get('amount')||0),doc:data.get('doc'),note:data.get('note')};if(transfer.sourceCompany===transfer.targetCompany&&transfer.sourceAccount===transfer.targetAccount){alert('\u0421\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u0435\u043b\u044f \u0438 \u0441\u0447\u0451\u0442 \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044f \u0434\u043e\u043b\u0436\u043d\u044b \u043e\u0442\u043b\u0438\u0447\u0430\u0442\u044c\u0441\u044f');return}if(index!==undefined)db.transfers[Number(index)]=transfer;else db.transfers.push(transfer);syncTransferIncomeV2(transfer);delete form.dataset.editIndex;form.reset();form.querySelector('.primary').textContent='\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043f\u0435\u0440\u0435\u0432\u043e\u0434';save()};
+transferTabV2.onclick=()=>{openTab('transfers');renderTransfersV2()};
+
+function showTransferPayment(index){const payment=db.payments[index];if(!payment)return;details('\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043c\u0435\u0436\u0434\u0443 \u0441\u0447\u0451\u0442\u0430\u043c\u0438',[[ '\u0414\u0430\u0442\u0430',payment.date],[ '\u0421\u043e \u0441\u0447\u0451\u0442\u0430',`${payment.sourceCompany||'\u2014'} \u2014 ${payment.sourceAccount||'\u2014'}`],[ '\u041d\u0430 \u0441\u0447\u0451\u0442',`${payment.targetCompany||payment.company||'\u2014'} \u2014 ${payment.targetAccount||payment.account||'\u2014'}`],[ '\u0421\u0443\u043c\u043c\u0430',money(payment.amount)],[ '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442',payment.doc]])}
+function renderPayments(){$('paymentsBody').innerHTML=db.payments.length?db.payments.map((payment,index)=>{const object=obj(payment.objectId),companyOnly=!object&&payment.company,label=companyOnly?esc(payment.company):object?.personalAccount?esc(PERSONAL_COMPANY):`${esc(object?.company||'\u2014')}<small style="display:block">${esc(object?.name||'\u2014')}</small>`,route=payment.internalTransfer?`<small style="display:block;color:var(--muted);margin-top:3px">${esc(payment.sourceCompany||'\u2014')} (${esc(payment.sourceAccount||'\u2014')}) \u2192 ${esc(payment.targetCompany||payment.company||'\u2014')} (${esc(payment.targetAccount||payment.account||'\u2014')})</small>`:'';return `<tr><td>${esc(payment.date)}</td><td>${companyOnly||object?.personalAccount?`<strong>${label}</strong>`:`<button class="row-link" type="button" onclick="showObj('${esc(payment.objectId)}')">${label}</button>`}</td><td>${esc(payment.type)}${route}</td><td class="amount">${money(payment.amount)}</td><td class="doc">${esc(payment.doc)||'\u2014'}${payment.automatic?'<small style="display:block;color:var(--green)">\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438</small>':''}</td><td>${payment.internalTransfer?`<button type="button" class="secondary" onclick="showTransferPayment(${index})">\u041f\u0440\u043e\u0441\u043c\u043e\u0442\u0440</button>`:payment.automatic?'<span class="hint">\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u0442\u0441\u044f \u0438\u0437 \u0440\u0430\u0441\u0445\u043e\u0434\u0430</span>':actionMenu(`editPayment(${index})`,`delPay(${index})`)}</td></tr>`}).join(''):empty(6)}
+function renderExpenses(){$('expensesBody').innerHTML=db.expenses.length?db.expenses.map((expense,index)=>`<tr><td>${esc(expense.date)}</td><td><button class="row-link" type="button" onclick="showObj('${esc(expense.objectId)}')">${esc(obj(expense.objectId)?.name||'\u2014')}</button></td><td>${esc(expense.category)}</td><td>${esc(expense.account)}</td><td class="amount">${money(expense.amount)}</td><td class="doc">${esc(expense.doc)||'\u2014'}</td><td class="doc">${esc(expense.note)||'\u2014'}</td><td>${actionMenu(`editExpense(${index})`,`delExp(${index})`)}</td></tr>`).join(''):empty(8)}
+function editExpense(index){const expense=db.expenses[index],form=$('expenseForm');if(!expense)return;form.dataset.editIndex=index;fillOperationCompanies(expenseCompanySelect,expense.company||obj(expense.objectId)?.company||'');fillOperationObjects($('expenseObject'),expense.company||obj(expense.objectId)?.company||'',expense.objectId);['objectId','company','date','category','account','amount','doc','note'].forEach(name=>setFormValue(form,name,expense[name]));prepareEdit(form,'\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f')}
+function showExp(index){const expense=db.expenses[index];if(!expense)return;details('\u0420\u0430\u0441\u0445\u043e\u0434',[[ '\u0414\u0430\u0442\u0430',expense.date],[ '\u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f',expense.company||obj(expense.objectId)?.company],[ '\u041e\u0431\u044a\u0435\u043a\u0442',obj(expense.objectId)?.name],[ '\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f',expense.category],[ '\u0421\u0447\u0451\u0442',expense.account],[ '\u0421\u0443\u043c\u043c\u0430',money(expense.amount)],[ '\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442',expense.doc],[ '\u041f\u0440\u0438\u043c\u0435\u0447\u0430\u043d\u0438\u0435',expense.note]])}
+$('expenseForm').onsubmit=event=>{event.preventDefault();const form=event.target,data=new FormData(form),index=form.dataset.editIndex,previous=index!==undefined?db.expenses[Number(index)]:null,expense={objectId:data.get('objectId'),company:data.get('company')||obj(data.get('objectId'))?.company||'',date:data.get('date'),category:data.get('category'),account:data.get('account'),amount:Number(data.get('amount')||0),doc:data.get('doc'),note:data.get('note'),linkedPersonalPaymentId:previous?.linkedPersonalPaymentId};if(index!==undefined)db.expenses[Number(index)]=expense;else db.expenses.push(expense);syncPersonalIncomeV2(expense);delete form.dataset.editIndex;form.reset();form.querySelector('.primary').textContent='\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0440\u0430\u0441\u0445\u043e\u0434';save()};
+
+const renderWithTransfersV2=render;render=function(){renderWithTransfersV2();renderTransfersV2();if(settingsSection.classList.contains('active'))renderCompanies()};
+const initializeCloudWithTransfersV2=initializeCloudData;initializeCloudData=async function(){await initializeCloudWithTransfersV2();if(reconcileTransfersV2()){localStorage.setItem(K,JSON.stringify(db));queueCloudSave();render()}};
+if(reconcileTransfersV2()){localStorage.setItem(K,JSON.stringify(db));queueCloudSave()}
 render();
 </script></body></html>
