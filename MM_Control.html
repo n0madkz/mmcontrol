@@ -439,5 +439,25 @@ $('companyFilter').onchange=()=>{$('objectFilter').value='';renderFinancialOverv
 $('objectFilter').onchange=renderFinancialOverview;
 const renderWithFilterMetricsV7=render;
 render=function(){renderWithFilterMetricsV7();renderFinancialOverview()};
+
+const faceIdHeaderStyleV8=document.createElement('style');
+faceIdHeaderStyleV8.textContent=`
+.header-inner .faceid-header-action{margin-left:auto;padding:9px 12px;border:1px solid #d4d7dc;border-radius:8px;background:#fff;color:#444;font-weight:700}
+.header-inner .faceid-header-action:hover{background:#f2f3f5}
+.header-inner .lock-button:not(.faceid-header-action){margin-left:0}
+@media(max-width:600px){.header-inner .faceid-header-action,.header-inner .lock-button{padding:7px 8px;font-size:10px}.header-inner{gap:7px}.brand-copy p{display:none}}
+`;
+document.head.appendChild(faceIdHeaderStyleV8);
+const faceIdHeaderButtonV8=document.createElement('button');
+faceIdHeaderButtonV8.type='button';
+faceIdHeaderButtonV8.className='faceid-header-action';
+faceIdHeaderButtonV8.textContent='Face ID';
+faceIdHeaderButtonV8.title='Подключить Face ID на этом устройстве';
+faceIdHeaderButtonV8.onclick=()=>registerFaceID();
+const headerActionsV8=document.querySelector('.header-inner'),lockButtonV8=document.querySelector('.lock-button:not(.passkey-setup)');
+headerActionsV8?.insertBefore(faceIdHeaderButtonV8,lockButtonV8||null);
+const refreshFaceIdSettingsButtonV8=refreshFaceIdSettingsButtonV4;
+refreshFaceIdSettingsButtonV4=async function(){await refreshFaceIdSettingsButtonV8();faceIdHeaderButtonV8.disabled=faceIdConnectButtonV5.disabled;faceIdHeaderButtonV8.title=faceIdHeaderButtonV8.disabled?'Face ID пока недоступен':'Подключить Face ID на этом устройстве'};
+refreshFaceIdSettingsButtonV4();
 render();
 </script></body></html>
