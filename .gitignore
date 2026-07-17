@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.*
 public/api/config.php
+public/vendor/
 *.log
 .DS_Store
 Thumbs.db

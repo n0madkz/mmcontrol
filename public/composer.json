@@ -1,0 +1,9 @@
+{
+  "require": {
+    "lbuchs/webauthn": "^2.2"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}

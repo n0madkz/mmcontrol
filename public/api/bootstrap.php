@@ -17,16 +17,22 @@ function input_json(): array {
     return $data;
 }
 
-function database(): PDO {
-    static $pdo = null;
-    if ($pdo instanceof PDO) return $pdo;
-
+function app_config(): array {
+    static $config = null;
+    if (is_array($config)) return $config;
     $configPath = __DIR__ . '/config.php';
     if (!is_file($configPath)) respond(['error' => 'Server database is not configured'], 503);
     $config = require $configPath;
     if (!is_array($config) || !isset($config['dsn'], $config['user'], $config['password'])) {
         respond(['error' => 'Invalid database configuration'], 503);
     }
+    return $config;
+}
+
+function database(): PDO {
+    static $pdo = null;
+    if ($pdo instanceof PDO) return $pdo;
+    $config = app_config();
 
     try {
         $pdo = new PDO($config['dsn'], $config['user'], $config['password'], [
@@ -61,6 +67,18 @@ function ensure_schema(PDO $pdo): void {
         data LONGTEXT NOT NULL,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT mm_app_state_user_fk FOREIGN KEY (user_id) REFERENCES mm_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS mm_passkeys (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id INT UNSIGNED NOT NULL,
+        credential_id VARCHAR(1024) NOT NULL UNIQUE,
+        credential_public_key MEDIUMTEXT NOT NULL,
+        signature_counter BIGINT UNSIGNED NOT NULL DEFAULT 0,
+        transports JSON NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_used_at TIMESTAMP NULL DEFAULT NULL,
+        CONSTRAINT mm_passkeys_user_fk FOREIGN KEY (user_id) REFERENCES mm_users(id) ON DELETE CASCADE,
+        INDEX mm_passkeys_user_idx (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 }
 
