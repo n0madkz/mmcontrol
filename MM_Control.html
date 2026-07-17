@@ -314,5 +314,20 @@ function closeSettingsPanelsV3(){settingsPanelsV3.forEach(panel=>{panel.card.hid
 function openSettingsPanelV3(key){let selected=null;settingsPanelsV3.forEach(panel=>{const open=panel.key===key;panel.card.hidden=!open;settingsPanelSwitcherV3.querySelector(`[data-settings-panel="${panel.key}"]`)?.classList.toggle('active',open);if(open)selected=panel});if(!selected)return;if(selected.key==='companies'){renderCompanies();setTimeout(()=>selected.card.querySelector('input')?.focus(),0)}else if(selected.key==='password')setTimeout(()=>$('changePasswordForm')?.elements.currentPassword?.focus(),0)}
 settingsPanelsV3.forEach(panel=>{panel.card.classList.add('settings-panel');panel.card.hidden=true;const button=document.createElement('button');button.type='button';button.className='secondary';button.dataset.settingsPanel=panel.key;button.textContent=panel.label;button.onclick=()=>{const visible=!panel.card.hidden;closeSettingsPanelsV3();if(!visible)openSettingsPanelV3(panel.key)};settingsPanelSwitcherV3.appendChild(button)});
 settingsTab.onclick=()=>{openTab('settings');closeSettingsPanelsV3()};
+const faceIdSettingsButtonV4=document.createElement('button');
+faceIdSettingsButtonV4.type='button';faceIdSettingsButtonV4.className='secondary';faceIdSettingsButtonV4.textContent='Face ID';faceIdSettingsButtonV4.title='Подключить Face ID на этом устройстве';
+faceIdSettingsButtonV4.onclick=()=>registerFaceID();
+settingsPanelSwitcherV3.prepend(faceIdSettingsButtonV4);
+async function refreshFaceIdSettingsButtonV4(){
+  document.querySelector('.passkey-setup')?.remove();
+  if(location.protocol!=='https:'||!window.PublicKeyCredential){faceIdSettingsButtonV4.disabled=true;faceIdSettingsButtonV4.textContent='Face ID недоступен';return}
+  try{await passkeyRequest('status');faceIdSettingsButtonV4.disabled=false;faceIdSettingsButtonV4.textContent='Face ID'}catch{faceIdSettingsButtonV4.disabled=true;faceIdSettingsButtonV4.textContent='Face ID недоступен'}
+}
+const initialPasskeyUIV4=initPasskeyUI;
+initPasskeyUI=async function(){await initialPasskeyUIV4();await refreshFaceIdSettingsButtonV4()};
+const registerFaceIDV4=registerFaceID;
+registerFaceID=async function(){await registerFaceIDV4();await refreshFaceIdSettingsButtonV4()};
+new MutationObserver(()=>document.querySelector('.passkey-setup')?.remove()).observe(document.querySelector('.header-inner'),{childList:true});
+refreshFaceIdSettingsButtonV4();
 render();
 </script></body></html>
