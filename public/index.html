@@ -412,5 +412,32 @@ mobileFirstStyleV6.textContent=`
 }
 `;
 document.head.appendChild(mobileFirstStyleV6);
+
+function updateDashboardByFilterV7(){
+  const selectedCompany=$('companyFilter')?.value||'',selectedObject=String($('objectFilter')?.value||'');
+  const objects=businessObjects().filter(object=>(!selectedCompany||object.company===selectedCompany)&&(!selectedObject||String(object.id)===selectedObject));
+  const objectIds=new Set(objects.map(object=>String(object.id)));
+  ensureCompanies();
+  const accountCompanies=selectedObject?[]:db.companies.filter(company=>(!selectedCompany||company===selectedCompany)&&(company===PERSONAL_COMPANY||db.payments.some(payment=>!payment.objectId&&payment.company===company)||db.expenses.some(expense=>!expense.objectId&&expense.company===company)));
+  const objectIncome=sum(db.payments.filter(payment=>objectIds.has(String(payment.objectId))).map(payment=>payment.amount));
+  const objectExpense=sum(db.expenses.filter(expense=>objectIds.has(String(expense.objectId))).map(expense=>expense.amount));
+  const accountIncome=sum(db.payments.filter(payment=>!payment.objectId&&accountCompanies.includes(payment.company)).map(payment=>payment.amount));
+  const accountExpense=sum(db.expenses.filter(expense=>!expense.objectId&&accountCompanies.includes(expense.company)).map(expense=>expense.amount));
+  const contract=sum(objects.map(object=>object.contractAmount)),income=objectIncome+accountIncome,expense=objectExpense+accountExpense;
+  $('mContract').textContent=money(contract);
+  $('mPaid').textContent=money(income);
+  $('mRemaining').textContent=money(contract-objectIncome);
+  $('mExpense').textContent=money(expense);
+  $('mProfit').textContent=money(contract-expense);
+  $('mWorking').textContent=objects.filter(object=>object.status==='\u0412 \u0440\u0430\u0431\u043e\u0442\u0435'||object.status==='\u041d\u0430 \u044d\u043a\u0441\u043f\u0435\u0440\u0442\u0438\u0437\u0435').length;
+  $('mOverdue').textContent=objects.filter(object=>object.status!=='\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d'&&days(object.endDate)!==null&&days(object.endDate)<0).length;
+  $('mWaiting').textContent=objects.filter(object=>Number(object.contractAmount)>paid(object.id)).length;
+}
+const renderFinancialOverviewV7=renderFinancialOverview;
+renderFinancialOverview=function(){renderFinancialOverviewV7();updateDashboardByFilterV7()};
+$('companyFilter').onchange=()=>{$('objectFilter').value='';renderFinancialOverview()};
+$('objectFilter').onchange=renderFinancialOverview;
+const renderWithFilterMetricsV7=render;
+render=function(){renderWithFilterMetricsV7();renderFinancialOverview()};
 render();
 </script></body></html>
