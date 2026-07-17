@@ -107,7 +107,7 @@ try {
     if ($action === 'status') {
         passkey_service();
         $count = (int)$pdo->query('SELECT COUNT(*) FROM mm_passkeys')->fetchColumn();
-        respond(['available' => $count > 0]);
+        respond(['available' => $count > 0, 'backend' => 'php-passkeys-v2']);
     }
 
     if ($action === 'register-options') {
