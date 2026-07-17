@@ -105,6 +105,7 @@ $action = (string)($_GET['action'] ?? 'status');
 
 try {
     if ($action === 'status') {
+        passkey_service();
         $count = (int)$pdo->query('SELECT COUNT(*) FROM mm_passkeys')->fetchColumn();
         respond(['available' => $count > 0]);
     }
