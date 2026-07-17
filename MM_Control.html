@@ -329,5 +329,64 @@ const registerFaceIDV4=registerFaceID;
 registerFaceID=async function(){await registerFaceIDV4();await refreshFaceIdSettingsButtonV4()};
 new MutationObserver(()=>document.querySelector('.passkey-setup')?.remove()).observe(document.querySelector('.header-inner'),{childList:true});
 refreshFaceIdSettingsButtonV4();
+
+const settingsWorkspaceStyleV5=document.createElement('style');
+settingsWorkspaceStyleV5.textContent=`
+nav.primary-navigation{top:79px;min-height:58px;align-items:center;gap:6px;padding:8px max(16px,calc((100% - 1280px)/2 + 16px))}
+nav.primary-navigation .tab{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 14px}
+.settings-workspace{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:500px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;box-shadow:0 5px 18px #2021240a}
+.settings-workspace .settings-panel-switcher{display:flex;flex-direction:column;align-items:stretch;gap:4px;margin:0;padding:14px 12px;background:#fafbfc;border-right:1px solid var(--line)}
+.settings-workspace .settings-panel-switcher button{display:flex;align-items:center;min-width:0;min-height:44px;width:100%;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:#373a3f;text-align:left;font-weight:650;box-shadow:none}
+.settings-workspace .settings-panel-switcher button::before{display:grid;place-items:center;flex:0 0 22px;width:22px;height:22px;margin-right:8px;border:1px solid #cfd3da;border-radius:6px;color:#666c74;font-size:12px;font-weight:800}
+.settings-workspace .settings-panel-switcher [data-settings-panel="faceid"]::before{content:"ID"}
+.settings-workspace .settings-panel-switcher [data-settings-panel="companies"]::before{content:"CO"}
+.settings-workspace .settings-panel-switcher [data-settings-panel="password"]::before{content:"PW"}
+.settings-workspace .settings-panel-switcher [data-settings-panel="backup"]::before{content:"BK"}
+.settings-workspace .settings-panel-switcher button:hover{background:#f0f2f5;color:var(--text)}
+.settings-workspace .settings-panel-switcher button.active{background:#e9ebf0;color:var(--text)}
+.settings-workspace .settings-panel-switcher button.active::before{border-color:#8f959e;background:#fff;color:var(--brand)}
+.settings-panel-content{min-width:0;padding:25px 28px 32px;background:#fff}
+.settings-panel-content .settings-panel{margin:0!important;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.settings-panel-content .settings-panel h3{margin:0 0 18px;font-size:20px}
+.settings-panel-content .settings-panel .actions{margin-top:4px}
+.faceid-setting-card{max-width:720px}
+.faceid-setting-card .faceid-setting-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px;border:1px solid var(--line);border-radius:8px;background:#fafbfc}
+.faceid-setting-card .faceid-setting-copy{display:grid;gap:4px}
+.faceid-setting-card .faceid-setting-copy strong{font-size:15px}
+.faceid-setting-card .faceid-setting-copy span{font-size:12px;color:var(--muted)}
+@media(max-width:760px){nav.primary-navigation{top:71px;min-height:54px;padding:6px 12px}nav.primary-navigation .tab{min-height:40px;padding:8px 12px}.settings-workspace{grid-template-columns:1fr;min-height:0}.settings-workspace .settings-panel-switcher{flex-direction:row;overflow:auto;padding:10px;border-right:0;border-bottom:1px solid var(--line)}.settings-workspace .settings-panel-switcher button{flex:0 0 auto;width:auto;min-height:40px}.settings-panel-content{padding:20px 16px}.faceid-setting-card .faceid-setting-row{align-items:flex-start;flex-direction:column}}
+`;
+document.head.appendChild(settingsWorkspaceStyleV5);
+
+const faceIdSettingsCardV5=document.createElement('div');
+faceIdSettingsCardV5.className='card settings-panel faceid-setting-card';
+faceIdSettingsCardV5.hidden=true;
+faceIdSettingsCardV5.innerHTML='<h3>Face ID</h3><div class="faceid-setting-row"><div class="faceid-setting-copy"><strong>Доступ на этом устройстве</strong><span id="faceIdSettingsStatus">Проверка доступности</span></div><button id="faceIdConnectButton" class="primary" type="button">Подключить Face ID</button></div>';
+settingsPanelsV3.push({key:'faceid',label:'Face ID',card:faceIdSettingsCardV5});
+faceIdSettingsButtonV4.dataset.settingsPanel='faceid';
+faceIdSettingsButtonV4.onclick=()=>{const visible=!faceIdSettingsCardV5.hidden;closeSettingsPanelsV3();if(!visible)openSettingsPanelV3('faceid')};
+
+const settingsWorkspaceV5=document.createElement('div');
+settingsWorkspaceV5.className='settings-workspace';
+const settingsContentV5=document.createElement('div');
+settingsContentV5.className='settings-panel-content';
+settingsSection.querySelector('h2').after(settingsWorkspaceV5);
+settingsWorkspaceV5.append(settingsPanelSwitcherV3,settingsContentV5);
+settingsPanelsV3.forEach(panel=>{panel.card.classList.add('settings-panel');panel.card.style.marginTop='0';settingsContentV5.appendChild(panel.card)});
+
+const faceIdConnectButtonV5=$('faceIdConnectButton'),faceIdSettingsStatusV5=$('faceIdSettingsStatus');
+faceIdConnectButtonV5.onclick=()=>registerFaceID();
+const refreshFaceIdSettingsButtonV5=refreshFaceIdSettingsButtonV4;
+refreshFaceIdSettingsButtonV4=async function(){
+  await refreshFaceIdSettingsButtonV5();
+  const available=!faceIdSettingsButtonV4.disabled;
+  faceIdConnectButtonV5.disabled=!available;
+  faceIdConnectButtonV5.textContent=available?'Подключить Face ID':'Face ID недоступен';
+  faceIdSettingsStatusV5.textContent=available?'Подключите Face ID для входа на этом устройстве':'Face ID пока недоступен';
+};
+const settingsTabV5=settingsTab.onclick;
+settingsTab.onclick=()=>{settingsTabV5();openSettingsPanelV3('faceid')};
+document.querySelector('nav')?.classList.add('primary-navigation');
+refreshFaceIdSettingsButtonV4();
 render();
 </script></body></html>
