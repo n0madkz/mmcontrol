@@ -57,7 +57,7 @@ function passkey_service(): \lbuchs\WebAuthn\WebAuthn {
         respond(['error' => 'Invalid Face ID domain configuration'], 503);
     }
 
-    return new \lbuchs\WebAuthn\WebAuthn('MM Control', strtolower($rpId), ['none']);
+    return new \lbuchs\WebAuthn\WebAuthn('MM Control', strtolower($rpId), ['none'], true);
 }
 
 function public_key_options(object $options): array {
