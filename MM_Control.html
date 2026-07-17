@@ -388,5 +388,29 @@ const settingsTabV5=settingsTab.onclick;
 settingsTab.onclick=()=>{settingsTabV5();openSettingsPanelV3('faceid')};
 document.querySelector('nav')?.classList.add('primary-navigation');
 refreshFaceIdSettingsButtonV4();
+
+const mobileFirstStyleV6=document.createElement('style');
+mobileFirstStyleV6.textContent=`
+@media(max-width:760px){
+  body{padding-bottom:calc(86px + env(safe-area-inset-bottom))}
+  nav.primary-navigation{position:fixed;top:auto;right:0;bottom:0;left:0;z-index:110;display:flex;min-height:72px;height:calc(72px + env(safe-area-inset-bottom));gap:2px;overflow:hidden;padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);border-bottom:0;box-shadow:0 -8px 24px #20212412}
+  nav.primary-navigation .tab{display:flex;flex:1 1 0;min-width:0;min-height:52px;padding:6px 3px;border-radius:7px;font-size:10px;line-height:1.15;text-align:center;white-space:normal;overflow-wrap:anywhere}
+  nav.primary-navigation .tab.active{box-shadow:none}
+  main{padding:16px 12px 26px}
+  .settings-workspace{border-radius:10px}
+  .settings-workspace .settings-panel-switcher{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:visible;padding:12px}
+  .settings-workspace .settings-panel-switcher button{min-width:0;min-height:48px;width:100%;padding:9px 10px;font-size:12px}
+  .settings-workspace .settings-panel-switcher button::before{flex-basis:20px;width:20px;height:20px;margin-right:6px;font-size:10px}
+  .settings-panel-content{padding:20px 14px 24px}
+  .settings-panel-content .settings-panel h3{font-size:18px;margin-bottom:14px}
+  .settings-panel-content form,.settings-panel-content .settings-add-form{grid-template-columns:1fr;max-width:none}
+  .settings-panel-content .actions{display:grid;grid-template-columns:1fr;gap:9px}
+  .settings-panel-content .actions .primary,.settings-panel-content .actions .file-button{width:100%;text-align:center}
+  .faceid-setting-card{max-width:none}
+  .faceid-setting-card .faceid-setting-row{padding:16px}
+  .faceid-setting-card .primary{width:100%}
+}
+`;
+document.head.appendChild(mobileFirstStyleV6);
 render();
 </script></body></html>
