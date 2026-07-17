@@ -296,5 +296,22 @@ $('expenseForm').onsubmit=event=>{event.preventDefault();const form=event.target
 const renderWithTransfersV2=render;render=function(){renderWithTransfersV2();renderTransfersV2();if(settingsSection.classList.contains('active'))renderCompanies()};
 const initializeCloudWithTransfersV2=initializeCloudData;initializeCloudData=async function(){await initializeCloudWithTransfersV2();if(reconcileTransfersV2()){localStorage.setItem(K,JSON.stringify(db));queueCloudSave();render()}};
 if(reconcileTransfersV2()){localStorage.setItem(K,JSON.stringify(db));queueCloudSave()}
+
+const settingsPanelStyleV3=document.createElement('style');
+settingsPanelStyleV3.textContent='.settings-panel-switcher{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}.settings-panel-switcher button{min-width:150px}.settings-panel-switcher button.active{background:#25272a;border-color:#25272a;color:#fff}.settings-panel[hidden]{display:none}';
+document.head.appendChild(settingsPanelStyleV3);
+const companySettingsCardV3=settingsSection.querySelector('.card'),passwordSettingsCardV3=$('changePasswordForm')?.closest('.card'),backupSettingsCardV3=backupCardV2;
+const settingsPanelsV3=[
+  {key:'companies',label:'\u041a\u043e\u043c\u043f\u0430\u043d\u0438\u0438',card:companySettingsCardV3},
+  {key:'password',label:'\u0421\u043c\u0435\u043d\u0430 \u043f\u0430\u0440\u043e\u043b\u044f',card:passwordSettingsCardV3},
+  {key:'backup',label:'\u0420\u0435\u0437\u0435\u0440\u0432\u043d\u0430\u044f \u043a\u043e\u043f\u0438\u044f',card:backupSettingsCardV3}
+].filter(panel=>panel.card);
+const settingsPanelSwitcherV3=document.createElement('div');
+settingsPanelSwitcherV3.className='settings-panel-switcher';
+settingsSection.querySelector('h2').after(settingsPanelSwitcherV3);
+function closeSettingsPanelsV3(){settingsPanelsV3.forEach(panel=>{panel.card.hidden=true;settingsPanelSwitcherV3.querySelector(`[data-settings-panel="${panel.key}"]`)?.classList.remove('active')})}
+function openSettingsPanelV3(key){let selected=null;settingsPanelsV3.forEach(panel=>{const open=panel.key===key;panel.card.hidden=!open;settingsPanelSwitcherV3.querySelector(`[data-settings-panel="${panel.key}"]`)?.classList.toggle('active',open);if(open)selected=panel});if(!selected)return;if(selected.key==='companies'){renderCompanies();setTimeout(()=>selected.card.querySelector('input')?.focus(),0)}else if(selected.key==='password')setTimeout(()=>$('changePasswordForm')?.elements.currentPassword?.focus(),0)}
+settingsPanelsV3.forEach(panel=>{panel.card.classList.add('settings-panel');panel.card.hidden=true;const button=document.createElement('button');button.type='button';button.className='secondary';button.dataset.settingsPanel=panel.key;button.textContent=panel.label;button.onclick=()=>{const visible=!panel.card.hidden;closeSettingsPanelsV3();if(!visible)openSettingsPanelV3(panel.key)};settingsPanelSwitcherV3.appendChild(button)});
+settingsTab.onclick=()=>{openTab('settings');closeSettingsPanelsV3()};
 render();
 </script></body></html>
