@@ -34,8 +34,20 @@ function binary_value(mixed $value): string {
 }
 
 function passkey_service(): \lbuchs\WebAuthn\WebAuthn {
-    $autoload = dirname(__DIR__) . '/vendor/autoload.php';
-    if (!is_file($autoload)) {
+    $siteRoot = dirname(__DIR__);
+    $autoloadPaths = [
+        $siteRoot . '/vendor/autoload.php',
+        // Supports Plesk deployments that copy public/ into httpdocs while Composer runs in public/.
+        $siteRoot . '/public/vendor/autoload.php',
+    ];
+    $autoload = null;
+    foreach ($autoloadPaths as $path) {
+        if (is_file($path)) {
+            $autoload = $path;
+            break;
+        }
+    }
+    if ($autoload === null) {
         respond(['error' => 'Face ID is not configured on the server yet'], 503);
     }
     require_once $autoload;
