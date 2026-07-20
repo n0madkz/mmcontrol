@@ -459,5 +459,29 @@ $('objectFilter').onchange=renderFinancialOverview;
 const renderWithFilterMetricsV7=render;
 render=function(){renderWithFilterMetricsV7();renderFinancialOverview()};
 
+// Операции могут быть отражены только по компании, без привязки к объекту.
+const optionalPaymentObjectV11=$('paymentObject');
+const optionalExpenseObjectV12=$('expenseObject');
+optionalPaymentObjectV11.required=false;
+optionalExpenseObjectV12.required=false;
+optionalPaymentObjectV11.removeAttribute('required');
+optionalExpenseObjectV12.removeAttribute('required');
+optionalPaymentObjectV11.setAttribute('aria-label','Объект, необязательно');
+optionalExpenseObjectV12.setAttribute('aria-label','Объект, необязательно');
+const fillOperationObjectsV11=fillOperationObjects;
+fillOperationObjects=function(select,company,current=''){
+  fillOperationObjectsV11(select,company,current);
+  if((select===optionalPaymentObjectV11||select===optionalExpenseObjectV12)&&select.options.length)select.options[0].textContent='Объект (необязательно)';
+};
+renderExpenses=function(){
+  $('expensesBody').innerHTML=db.expenses.length?db.expenses.map((expense,index)=>{
+    const object=obj(expense.objectId),companyOnly=!object&&expense.company;
+    const owner=companyOnly?`<strong>${esc(expense.company)}</strong>`:`<button class="row-link" type="button" onclick="showObj('${esc(expense.objectId)}')">${esc(object?.name||'—')}</button>`;
+    return `<tr><td>${esc(expense.date)}</td><td>${owner}</td><td>${esc(expense.category)}</td><td>${esc(expense.account)}</td><td class="amount">${money(expense.amount)}</td><td class="doc">${esc(expense.doc)||'—'}</td><td class="doc">${esc(expense.note)||'—'}</td><td>${actionMenu(`editExpense(${index})`,`delExp(${index})`)}</td></tr>`;
+  }).join(''):empty(8);
+};
+document.querySelector('#payments thead th:nth-child(2)').textContent='Объект / компания';
+document.querySelector('#expenses thead th:nth-child(2)').textContent='Объект / компания';
+
 render();
 </script></body></html>
