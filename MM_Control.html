@@ -483,5 +483,32 @@ renderExpenses=function(){
 document.querySelector('#payments thead th:nth-child(2)').textContent='Объект / компания';
 document.querySelector('#expenses thead th:nth-child(2)').textContent='Объект / компания';
 
+function decimalAmountV14(value){
+  const normalized=String(value??'').trim().replace(',','.');
+  if(!/^\d+(?:\.\d{1,2})?$/.test(normalized))return null;
+  const amount=Number(normalized);
+  return Number.isFinite(amount)&&amount>=0?Math.round((amount+Number.EPSILON)*100)/100:null;
+}
+function configureDecimalAmountV14(input){
+  input.step='0.01';
+  input.inputMode='decimal';
+  input.addEventListener('input',()=>{
+    const value=input.value;
+    input.setCustomValidity(value&&decimalAmountV14(value)===null?'Укажите сумму с точностью не более 2 знаков после запятой.':'');
+  });
+  input.addEventListener('change',()=>{
+    const amount=decimalAmountV14(input.value);
+    if(amount!==null)input.value=String(amount);
+  });
+}
+const decimalAmountInputsV14=[
+  '#objectForm [name="contractAmount"]',
+  '#objectForm [name="advancePlan"]',
+  '#paymentForm [name="amount"]',
+  '#expenseForm [name="amount"]',
+  '#transferForm [name="amount"]'
+].map(selector=>document.querySelector(selector)).filter(Boolean);
+decimalAmountInputsV14.forEach(configureDecimalAmountV14);
+
 render();
 </script></body></html>
