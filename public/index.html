@@ -353,6 +353,7 @@ nav.primary-navigation .tab{display:inline-flex;align-items:center;justify-conte
 .settings-workspace .settings-panel-switcher [data-settings-panel="companies"]::before{content:"CO"}
 .settings-workspace .settings-panel-switcher [data-settings-panel="password"]::before{content:"PW"}
 .settings-workspace .settings-panel-switcher [data-settings-panel="backup"]::before{content:"BK"}
+.settings-workspace .settings-panel-switcher [data-settings-panel="sync"]::before{content:"SY"}
 .settings-workspace .settings-panel-switcher button:hover{background:#f0f2f5;color:var(--text)}
 .settings-workspace .settings-panel-switcher button.active{background:#e9ebf0;color:var(--text)}
 .settings-workspace .settings-panel-switcher button.active::before{border-color:#8f959e;background:#fff;color:var(--brand)}
@@ -377,6 +378,19 @@ settingsPanelsV3.push({key:'faceid',label:'Face ID',card:faceIdSettingsCardV5});
 faceIdSettingsButtonV4.dataset.settingsPanel='faceid';
 faceIdSettingsButtonV4.onclick=()=>{const visible=!faceIdSettingsCardV5.hidden;closeSettingsPanelsV3();if(!visible)openSettingsPanelV3('faceid')};
 
+const syncSettingsCardV15=document.createElement('div');
+syncSettingsCardV15.className='card settings-panel faceid-setting-card sync-setting-card';
+syncSettingsCardV15.hidden=true;
+syncSettingsCardV15.innerHTML='<h3>Синхронизация</h3><div class="faceid-setting-row"><div class="faceid-setting-copy"><strong>Данные на всех устройствах</strong><span id="syncSettingsStatus">Синхронизируйте текущие данные с сервером</span></div><button id="syncNowButton" class="primary" type="button">Синхронизировать</button></div>';
+settingsPanelsV3.push({key:'sync',label:'Синхронизация',card:syncSettingsCardV15});
+const syncSettingsButtonV15=document.createElement('button');
+syncSettingsButtonV15.type='button';
+syncSettingsButtonV15.className='secondary';
+syncSettingsButtonV15.dataset.settingsPanel='sync';
+syncSettingsButtonV15.textContent='Синхронизация';
+syncSettingsButtonV15.onclick=()=>{const visible=!syncSettingsCardV15.hidden;closeSettingsPanelsV3();if(!visible)openSettingsPanelV3('sync')};
+faceIdSettingsButtonV4.after(syncSettingsButtonV15);
+
 const settingsWorkspaceV5=document.createElement('div');
 settingsWorkspaceV5.className='settings-workspace';
 const settingsContentV5=document.createElement('div');
@@ -395,6 +409,35 @@ refreshFaceIdSettingsButtonV4=async function(){
   faceIdConnectButtonV5.textContent=available?'Подключить Face ID':'Face ID недоступен';
   faceIdSettingsStatusV5.textContent=available?'Подключите Face ID для входа на этом устройстве':'Face ID пока недоступен';
 };
+const syncNowButtonV15=$('syncNowButton'),syncSettingsStatusV15=$('syncSettingsStatus');
+async function syncNowV15(){
+  if(!getDataToken()){syncSettingsStatusV15.textContent='Войдите в систему, чтобы выполнить синхронизацию';return}
+  syncNowButtonV15.disabled=true;
+  syncNowButtonV15.textContent='Синхронизация...';
+  syncSettingsStatusV15.textContent='Отправляем данные на сервер';
+  try{
+    if(cloudSaveTimer){clearTimeout(cloudSaveTimer);cloudSaveTimer=null}
+    await cloudSaveChain;
+    const snapshot=JSON.parse(JSON.stringify(db));
+    await cloudDataRequest('PUT',snapshot);
+    const result=await cloudDataRequest();
+    if(result.data){
+      db=result.data;
+      ensureCompanies();
+      ensurePersonalStructure();
+      localStorage.setItem(K,JSON.stringify(db));
+      render();
+    }
+    cloudInitialized=true;
+    syncSettingsStatusV15.textContent='Синхронизация завершена';
+  }catch(error){
+    syncSettingsStatusV15.textContent='Ошибка синхронизации: '+(error.message||'попробуйте ещё раз');
+  }finally{
+    syncNowButtonV15.disabled=false;
+    syncNowButtonV15.textContent='Синхронизировать';
+  }
+}
+syncNowButtonV15.onclick=syncNowV15;
 const settingsTabV5=settingsTab.onclick;
 settingsTab.onclick=()=>{settingsTabV5();openSettingsPanelV3('faceid')};
 document.querySelector('nav')?.classList.add('primary-navigation');
