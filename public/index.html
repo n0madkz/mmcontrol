@@ -553,5 +553,67 @@ const decimalAmountInputsV14=[
 ].map(selector=>document.querySelector(selector)).filter(Boolean);
 decimalAmountInputsV14.forEach(configureDecimalAmountV14);
 
+function transferOutForCompaniesV17(companies){
+  const list=new Set(companies);
+  return sum((db.transfers||[]).filter(transfer=>list.has(transfer.sourceCompany)).map(transfer=>transfer.amount));
+}
+function companyAccountOperationsV17(company){
+  const incomes=db.payments.filter(payment=>!payment.objectId&&payment.company===company).map(payment=>({date:payment.date,kind:'income',type:payment.type,amount:Number(payment.amount)||0,doc:payment.doc,note:payment.internalTransfer?`${payment.sourceCompany||'—'} — ${payment.sourceAccount||'—'} → ${payment.targetAccount||payment.account||'—'}`:''}));
+  const expenses=db.expenses.filter(expense=>!expense.objectId&&expense.company===company).map(expense=>({date:expense.date,kind:'expense',type:expense.category,amount:Number(expense.amount)||0,doc:expense.doc,note:expense.note||''}));
+  const transferExpenses=(db.transfers||[]).filter(transfer=>transfer.sourceCompany===company).map(transfer=>({date:transfer.date,kind:'expense',type:'Перевод между счетами',amount:Number(transfer.amount)||0,doc:transfer.doc,note:`${transfer.sourceAccount||'—'} → ${transfer.targetCompany||'—'} — ${transfer.targetAccount||'—'}`}));
+  const operations=[...incomes,...expenses,...transferExpenses].sort((left,right)=>String(right.date).localeCompare(String(left.date)));
+  const income=sum(incomes.map(operation=>operation.amount)),expense=sum([...expenses,...transferExpenses].map(operation=>operation.amount));
+  $('detailTitle').textContent=`Счёт компании: ${company}`;
+  $('detailBody').style.display='block';
+  $('detailBody').innerHTML=`<div class="ops-summary"><div><small>Поступления</small><strong>${money(income)}</strong></div><div><small>Расходы</small><strong>${money(expense)}</strong></div><div><small>Чистый остаток</small><strong>${money(income-expense)}</strong></div></div><div class="table-wrap"><table class="ops-table"><thead><tr><th>Дата</th><th>Операция</th><th>Тип</th><th>Сумма</th><th>Документ</th><th>Примечание</th></tr></thead><tbody>${operations.length?operations.map(operation=>`<tr><td>${esc(operation.date)}</td><td class="${operation.kind==='income'?'operation-income':'operation-expense'}">${operation.kind==='income'?'Поступление':'Списание'}</td><td>${esc(operation.type)}</td><td class="amount">${operation.kind==='income'?'+':'-'} ${money(operation.amount)}</td><td>${esc(operation.doc)||'—'}</td><td>${esc(operation.note)||'—'}</td></tr>`).join(''):empty(6)}</tbody></table></div>`;
+  $('detailDialog').showModal();
+}
+function updateDashboardByFilterV17(){
+  const selectedCompany=$('companyFilter')?.value||'',selectedObject=String($('objectFilter')?.value||'');
+  const objects=businessObjects().filter(object=>(!selectedCompany||object.company===selectedCompany)&&(!selectedObject||String(object.id)===selectedObject));
+  const objectIds=new Set(objects.map(object=>String(object.id)));
+  ensureCompanies();
+  const accountCompanies=selectedObject?[]:db.companies.filter(company=>(!selectedCompany||company===selectedCompany)&&(company===PERSONAL_COMPANY||db.payments.some(payment=>!payment.objectId&&payment.company===company)||db.expenses.some(expense=>!expense.objectId&&expense.company===company)||(db.transfers||[]).some(transfer=>transfer.sourceCompany===company||transfer.targetCompany===company)));
+  const objectIncome=sum(db.payments.filter(payment=>objectIds.has(String(payment.objectId))).map(payment=>payment.amount));
+  const objectExpense=sum(db.expenses.filter(expense=>objectIds.has(String(expense.objectId))).map(expense=>expense.amount));
+  const accountIncome=sum(db.payments.filter(payment=>!payment.objectId&&accountCompanies.includes(payment.company)).map(payment=>payment.amount));
+  const accountExpense=sum(db.expenses.filter(expense=>!expense.objectId&&accountCompanies.includes(expense.company)).map(expense=>expense.amount))+transferOutForCompaniesV17(accountCompanies);
+  const contract=sum(objects.map(object=>object.contractAmount)),income=objectIncome+accountIncome,expense=objectExpense+accountExpense;
+  $('mContract').textContent=money(contract);
+  $('mPaid').textContent=money(income);
+  $('mRemaining').textContent=money(contract-objectIncome);
+  $('mExpense').textContent=money(expense);
+  $('mProfit').textContent=money(contract-expense);
+  $('mWorking').textContent=objects.filter(object=>object.status==='В работе'||object.status==='На экспертизе').length;
+  $('mOverdue').textContent=objects.filter(object=>object.status!=='Завершен'&&days(object.endDate)!==null&&days(object.endDate)<0).length;
+  $('mWaiting').textContent=objects.filter(object=>Number(object.contractAmount)>paid(object.id)).length;
+}
+function renderFinancialOverviewV17(){
+  const companySelect=$('companyFilter'),objectSelect=$('objectFilter');
+  if(!companySelect||!objectSelect)return;
+  const selectedCompany=companySelect.value,selectedObject=objectSelect.value;
+  ensureCompanies();
+  const companies=[...db.companies].sort((left,right)=>left.localeCompare(right));
+  companySelect.innerHTML='<option value="">Все компании</option>'+companies.map(company=>`<option value="${esc(company)}">${esc(company)}</option>`).join('');
+  if(companies.includes(selectedCompany))companySelect.value=selectedCompany;
+  const objects=businessObjects().filter(object=>!companySelect.value||object.company===companySelect.value);
+  objectSelect.innerHTML='<option value="">Все объекты</option>'+objects.map(object=>`<option value="${esc(object.id)}">${esc(object.name)}</option>`).join('');
+  if(objects.some(object=>String(object.id)===String(selectedObject)))objectSelect.value=selectedObject;
+  const rows=objects.filter(object=>!objectSelect.value||String(object.id)===String(objectSelect.value));
+  const accountCompanies=objectSelect.value?[]:companies.filter(company=>(!companySelect.value||company===companySelect.value)&&(company===PERSONAL_COMPANY||db.payments.some(payment=>!payment.objectId&&payment.company===company)||db.expenses.some(expense=>!expense.objectId&&expense.company===company)||(db.transfers||[]).some(transfer=>transfer.sourceCompany===company||transfer.targetCompany===company)));
+  const objectIncome=sum(rows.map(object=>paid(object.id))),objectExpense=sum(rows.map(object=>spent(object.id)));
+  const accountIncome=sum(db.payments.filter(payment=>!payment.objectId&&accountCompanies.includes(payment.company)).map(payment=>payment.amount));
+  const accountExpense=sum(db.expenses.filter(expense=>!expense.objectId&&accountCompanies.includes(expense.company)).map(expense=>expense.amount))+transferOutForCompaniesV17(accountCompanies);
+  const contracts=sum(rows.map(object=>object.contractAmount)),income=objectIncome+accountIncome,expense=objectExpense+accountExpense;
+  $('overviewTotals').innerHTML=`<div><small>Поступления</small><strong>${money(income)}</strong></div><div><small>Расходы</small><strong>${money(expense)}</strong></div><div><small>Остаток по договору</small><strong>${money(contracts-objectIncome)}</strong></div><div><small>Чистый остаток</small><strong>${money(income-expense)}</strong></div>`;
+  document.querySelector('.finance-table thead tr').innerHTML='<th>Компания</th><th>Объект / счёт</th><th>Сумма договора</th><th>Поступления</th><th>Остаток по договору</th><th>Расходы</th><th>Чистый остаток</th>';
+  const objectRows=rows.map(object=>{const contract=Number(object.contractAmount||0),income=paid(object.id),expense=spent(object.id),remaining=contract-income,net=income-expense;return `<tr onclick="showOperations('${esc(object.id)}')"><td>${esc(object.company)}</td><td><button type="button" class="row-link">${esc(object.name)}</button></td><td class="amount">${money(contract)}</td><td class="amount">${money(income)}</td><td class="amount ${remaining>=0?'':'net-negative'}">${money(remaining)}</td><td class="amount">${money(expense)}</td><td class="amount ${net>=0?'net-positive':'net-negative'}">${money(net)}</td></tr>`});
+  const accountRows=accountCompanies.map(company=>{const income=sum(db.payments.filter(payment=>!payment.objectId&&payment.company===company).map(payment=>payment.amount)),expense=sum(db.expenses.filter(item=>!item.objectId&&item.company===company).map(item=>item.amount))+transferOutForCompaniesV17([company]),net=income-expense;return `<tr onclick="companyAccountOperationsV17('${esc(company)}')"><td>${esc(company)}</td><td><button type="button" class="row-link">Счёт компании</button></td><td class="amount">—</td><td class="amount">${money(income)}</td><td class="amount">—</td><td class="amount">${money(expense)}</td><td class="amount ${net>=0?'net-positive':'net-negative'}">${money(net)}</td></tr>`});
+  $('financeOverviewBody').innerHTML=objectRows.length||accountRows.length?[...accountRows,...objectRows].join(''):empty(7);
+}
+renderFinancialOverview=function(){renderFinancialOverviewV17();updateDashboardByFilterV17()};
+$('companyFilter').onchange=()=>{$('objectFilter').value='';renderFinancialOverview()};
+$('objectFilter').onchange=renderFinancialOverview;
+
 render();
 </script></body></html>
